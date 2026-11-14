@@ -11,10 +11,8 @@ import (
 
 const skew = 30 * time.Second
 
-// backchannelEvent es el evento que trae todo logout token (OIDC Back-Channel Logout §2.4).
 const backchannelEvent = "http://schemas.openid.net/event/backchannel-logout"
 
-// Identity es lo que el producto sabe de quien entró, sacado del ID token.
 type Identity struct {
 	Subject       string `json:"sub"`
 	Email         string `json:"email,omitempty"`
@@ -25,8 +23,7 @@ type Identity struct {
 	Locale        string `json:"locale,omitempty"`
 }
 
-// verifyIDToken comprueba firma, emisor, audiencia, vigencia y nonce (OIDC Core §3.1.3.7). Devuelve también el sid,
-// con el que el emisor avisa luego de que esa sesión se cerró.
+// OIDC Core §3.1.3.7.
 func (p *Provider) verifyIDToken(raw, clientID, nonce string) (Identity, string, error) {
 	tok, err := jwt.ParseString(raw, jwt.WithKeySet(p.keys), jwt.WithIssuer(p.Issuer), jwt.WithAudience(clientID),
 		jwt.WithAcceptableSkew(skew), jwt.WithRequiredClaim(jwt.ExpirationKey), jwt.WithRequiredClaim(jwt.SubjectKey))
@@ -37,7 +34,6 @@ func (p *Provider) verifyIDToken(raw, clientID, nonce string) (Identity, string,
 	if err := tok.Get("nonce", &got); err != nil || got != nonce {
 		return Identity{}, "", errors.New("auth: id token: nonce mismatch")
 	}
-	// Con varias audiencias, azp tiene que ser este cliente.
 	if aud, _ := tok.Audience(); len(aud) > 1 {
 		var azp string
 		if err := tok.Get("azp", &azp); err != nil || azp != clientID {
@@ -57,7 +53,7 @@ func (p *Provider) verifyIDToken(raw, clientID, nonce string) (Identity, string,
 	return id, sid, nil
 }
 
-// verifyLogoutToken valida un logout token del back-channel (§2.6) y devuelve a qué sesión o persona afecta.
+// OIDC Back-Channel Logout §2.6.
 func (p *Provider) verifyLogoutToken(raw, clientID string) (sid, sub string, err error) {
 	tok, err := jwt.ParseString(raw, jwt.WithKeySet(p.keys), jwt.WithIssuer(p.Issuer), jwt.WithAudience(clientID),
 		jwt.WithAcceptableSkew(skew), jwt.WithRequiredClaim(jwt.IssuedAtKey), jwt.WithRequiredClaim(jwt.JwtIDKey))
@@ -74,7 +70,6 @@ func (p *Provider) verifyLogoutToken(raw, clientID string) (sid, sub string, err
 	if _, ok := events[backchannelEvent]; !ok {
 		return "", "", errors.New("auth: logout token: not a logout event")
 	}
-	// Un nonce lo haría pasar por un ID token.
 	if slices.Contains(tok.Keys(), "nonce") {
 		return "", "", errors.New("auth: logout token: has a nonce")
 	}

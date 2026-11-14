@@ -5,8 +5,7 @@ import (
 	"net/url"
 )
 
-// Routes son las rutas /auth/*; se montan tal cual en la raíz del producto. Lo que cambia algo sólo se acepta desde
-// este mismo origen; el aviso del emisor (servidor a servidor, sin Origin) pasa.
+// Routes son las rutas /auth/*, para montar en la raíz del producto.
 func (a *Auth) Routes() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /auth/login", a.handleLogin)
@@ -17,8 +16,7 @@ func (a *Auth) Routes() http.Handler {
 	return http.NewCrossOriginProtection().Handler(mux)
 }
 
-// handleLogout cierra la sesión aquí y en el emisor: borra la sesión y manda al emisor con id_token_hint, que vuelve
-// a la portada del producto. Es un POST de formulario: el navegador sigue la redirección.
+// handleLogout cierra aquí y en el emisor. Es un POST de formulario: el navegador sigue la redirección.
 func (a *Auth) handleLogout(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	var hint string
@@ -50,8 +48,7 @@ func (a *Auth) handleLogout(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, u.String(), http.StatusSeeOther)
 }
 
-// handleBackchannel recibe del emisor el aviso de que una sesión se cerró (en otro producto, en la Cuenta o por un
-// administrador) y borra las de aquí. ponytail: no guarda los jti; repetir un aviso sólo vuelve a borrar lo borrado.
+// ponytail: no guarda los jti; repetir un aviso sólo vuelve a borrar lo ya borrado.
 func (a *Auth) handleBackchannel(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	w.Header().Set("Cache-Control", "no-store")

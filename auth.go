@@ -19,14 +19,12 @@ type Config struct {
 	Issuer       string
 	ClientID     string
 	ClientSecret string
-	// BaseURL es donde el navegador ve el producto (https://accounts.fretchcop.space); la vuelta del emisor es
-	// BaseURL + "/auth/callback".
+	// BaseURL es donde el navegador ve el producto; la vuelta va a BaseURL + "/auth/callback".
 	BaseURL string
 	// Scopes además de openid; por defecto profile y email.
 	Scopes []string
 	Store  Store
-	// MaxAge es el tope de una sesión aunque se use a diario; por defecto 90 días, como «Recordarme» en el emisor.
-	// Antes la cierra el emisor si la persona deja de usarla: el refresco falla y la sesión se borra.
+	// MaxAge es el tope de una sesión; por defecto 90 días.
 	MaxAge     time.Duration
 	HTTPClient *http.Client
 	Logger     *slog.Logger
@@ -45,7 +43,7 @@ type Auth struct {
 	now      func() time.Time
 }
 
-// New descubre el emisor. ctx debe durar lo que la aplicación: de él cuelga el refresco de las claves.
+// New descubre el emisor. ctx debe durar lo que la aplicación: refresca las claves.
 func New(ctx context.Context, cfg Config) (*Auth, error) {
 	if cfg.Issuer == "" || cfg.ClientID == "" || cfg.ClientSecret == "" || cfg.BaseURL == "" || cfg.Store == nil {
 		return nil, errors.New("auth: Issuer, ClientID, ClientSecret, BaseURL and Store are required")
@@ -85,7 +83,7 @@ func New(ctx context.Context, cfg Config) (*Auth, error) {
 			Scopes:       append([]string{"openid"}, cfg.Scopes...),
 		},
 	}
-	// __Host- obliga a Secure, Path=/ y sin Domain: la cookie no sale de este origen. En http (desarrollo) no se puede.
+	// __Host- exige https; en desarrollo (http) va sin prefijo.
 	a.cookie, a.login = "session", "login"
 	if a.secure {
 		a.cookie, a.login = "__Host-session", "__Host-login"
@@ -93,7 +91,6 @@ func New(ctx context.Context, cfg Config) (*Auth, error) {
 	return a, nil
 }
 
-// client es el HTTP que usa oauth2 para hablar con el emisor.
 func (a *Auth) client(ctx context.Context) context.Context {
 	return context.WithValue(ctx, oauth2.HTTPClient, a.cfg.HTTPClient)
 }

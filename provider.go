@@ -14,7 +14,7 @@ import (
 	"github.com/lestrrat-go/jwx/v3/jwk"
 )
 
-// Provider es el emisor OIDC: los endpoints que publica su discovery y sus claves de firma, que se refrescan solas.
+// Provider es el emisor OIDC: sus endpoints y sus claves, que se refrescan solas.
 type Provider struct {
 	Issuer        string
 	AuthURL       string
@@ -31,8 +31,7 @@ type discovery struct {
 	JWKSURI               string `json:"jwks_uri"`
 }
 
-// Discover lee la configuración del emisor y deja sus claves en caché. ctx debe durar lo que la aplicación: de él
-// cuelga el refresco de las claves.
+// ctx debe durar lo que la aplicación: refresca las claves.
 func Discover(ctx context.Context, issuer string, client *http.Client) (*Provider, error) {
 	if client == nil {
 		client = &http.Client{Timeout: 10 * time.Second}
@@ -53,14 +52,13 @@ func Discover(ctx context.Context, issuer string, client *http.Client) (*Provide
 	if err := json.NewDecoder(io.LimitReader(res.Body, 1<<20)).Decode(&d); err != nil {
 		return nil, fmt.Errorf("auth: discovery: %w", err)
 	}
-	// El emisor que firma tiene que ser el que se configuró (OIDC Discovery §4.3).
+	// OIDC Discovery §4.3.
 	if d.Issuer != issuer {
 		return nil, fmt.Errorf("auth: discovery: issuer %q, want %q", d.Issuer, issuer)
 	}
 	if d.AuthorizationEndpoint == "" || d.TokenEndpoint == "" || d.JWKSURI == "" {
 		return nil, errors.New("auth: discovery: missing endpoints")
 	}
-	// Las claves se piden sólo al mismo origen del emisor.
 	if !sameOrigin(d.JWKSURI, issuer) {
 		return nil, fmt.Errorf("auth: discovery: jwks_uri %q outside the issuer", d.JWKSURI)
 	}

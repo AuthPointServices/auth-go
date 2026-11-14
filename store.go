@@ -10,16 +10,14 @@ import (
 	"time"
 )
 
-// ErrNotFound: la sesión o el inicio de sesión no existe o ya venció.
 var ErrNotFound = errors.New("auth: not found")
 
-// Session es una sesión del producto: quién es y sus tokens, que nunca salen del servidor.
 type Session struct {
-	// ID es el valor de la cookie. Los almacenes guardan sólo su hash.
+	// ID es el valor de la cookie; se guarda su hash.
 	ID           string
 	Identity     Identity
-	SID          string // la sesión del emisor, para el cierre por back-channel
-	IDToken      string // id_token_hint al cerrar sesión
+	SID          string
+	IDToken      string
 	AccessToken  string
 	RefreshToken string
 	AccessExpiry time.Time
@@ -27,20 +25,18 @@ type Session struct {
 	ExpiresAt    time.Time
 }
 
-// Login es un inicio de sesión a medio hacer: lo que hace falta al volver del emisor.
+// Login es un inicio de sesión a medio hacer.
 type Login struct {
-	Verifier  string // PKCE
+	Verifier  string
 	Nonce     string
 	ReturnTo  string
 	ExpiresAt time.Time
 }
 
-// Store guarda sesiones e inicios de sesión. Update debe excluir a otros Update de la misma sesión mientras corre
-// fn (el refresh token sirve una sola vez y dos refrescos a la vez cerrarían la sesión) y darle a fn la sesión con
-// su ID.
+// Update debe excluir a otros Update de la misma sesión mientras corre fn, y darle la sesión con su ID.
 type Store interface {
 	SaveLogin(ctx context.Context, state string, l Login) error
-	// TakeLogin lo devuelve y lo borra: cada state sirve una vez.
+	// TakeLogin lo borra: cada state sirve una vez.
 	TakeLogin(ctx context.Context, state string) (Login, error)
 	Create(ctx context.Context, s *Session) error
 	Get(ctx context.Context, id string) (*Session, error)
@@ -50,20 +46,18 @@ type Store interface {
 	DeleteBySubject(ctx context.Context, sub string) error
 }
 
-// newID son 32 bytes al azar en base64url: el valor de una cookie o de un state.
 func newID() string {
 	b := make([]byte, 32)
 	_, _ = rand.Read(b)
 	return base64.RawURLEncoding.EncodeToString(b)
 }
 
-// HashID es la clave con la que se guarda un ID: quien lea el almacén no puede usar las sesiones.
 func HashID(id string) []byte {
 	h := sha256.Sum256([]byte(id))
 	return h[:]
 }
 
-// MemoryStore guarda en memoria. Sirve para pruebas y para un solo proceso: al reiniciar se pierden las sesiones.
+// MemoryStore es para pruebas o un solo proceso: al reiniciar se pierde todo.
 type MemoryStore struct {
 	mu       sync.Mutex
 	sessions map[[32]byte]Session
@@ -113,7 +107,7 @@ func (m *MemoryStore) Get(_ context.Context, id string) (*Session, error) {
 	return &s, nil
 }
 
-// ponytail: un solo candado para todo el almacén; basta en pruebas y en un proceso pequeño.
+// ponytail: un candado para todo el almacén.
 func (m *MemoryStore) Update(_ context.Context, id string, fn func(*Session) error) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()

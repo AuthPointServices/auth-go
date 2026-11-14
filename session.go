@@ -10,7 +10,6 @@ import (
 	"golang.org/x/oauth2"
 )
 
-// refreshBefore: el token de acceso se renueva si le queda menos que esto.
 const refreshBefore = 30 * time.Second
 
 var errEnded = errors.New("auth: session ended at the issuer")
@@ -23,12 +22,12 @@ func FromContext(ctx context.Context) (*Session, bool) {
 	return s, ok
 }
 
-// NewContext deja s en ctx como lo haría Require; sirve para probar los handlers del producto.
+// NewContext sirve para probar handlers.
 func NewContext(ctx context.Context, s *Session) context.Context {
 	return context.WithValue(ctx, ctxKey{}, s)
 }
 
-// Load lee la sesión de la cookie, renueva su token si hace falta y la deja en el contexto. Sin sesión, sigue igual.
+// Load deja la sesión en el contexto si la hay.
 func (a *Auth) Load(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if s := a.current(w, r); s != nil {
@@ -38,8 +37,7 @@ func (a *Auth) Load(next http.Handler) http.Handler {
 	})
 }
 
-// Require es Load para una API: sin sesión responde 401. Además rechaza los pedidos que cambian algo desde otro
-// origen (CSRF), porque la cookie viaja sola.
+// Require responde 401 sin sesión y rechaza pedidos de otro origen (CSRF).
 func (a *Auth) Require(next http.Handler) http.Handler {
 	return http.NewCrossOriginProtection().Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		s := a.current(w, r)
@@ -53,8 +51,6 @@ func (a *Auth) Require(next http.Handler) http.Handler {
 	}))
 }
 
-// current es la sesión de este pedido con su token al día; nil si no hay o el emisor la cerró. Una cookie que ya
-// no vale se borra.
 func (a *Auth) current(w http.ResponseWriter, r *http.Request) *Session {
 	c, err := r.Cookie(a.cookie)
 	if err != nil || c.Value == "" {
@@ -75,8 +71,7 @@ func (a *Auth) current(w http.ResponseWriter, r *http.Request) *Session {
 	return s
 }
 
-// fresh renueva el token de acceso si está por vencer. Con la sesión bloqueada: si otro pedido la renovó mientras
-// tanto, usa la suya. Si el emisor ya no la acepta (la cerró, o venció), la sesión se borra.
+// fresh renueva el token con la sesión bloqueada: los refresh tokens sirven una vez.
 func (a *Auth) fresh(ctx context.Context, s *Session) (*Session, error) {
 	if a.now().Add(refreshBefore).Before(s.AccessExpiry) {
 		return s, nil
@@ -117,7 +112,7 @@ func (a *Auth) fresh(ctx context.Context, s *Session) (*Session, error) {
 	return &out, nil
 }
 
-// handleSession le dice al frontend si hay sesión y quién es; nunca le da tokens.
+// handleSession nunca devuelve tokens.
 func (a *Auth) handleSession(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Cache-Control", "no-store")

@@ -1,5 +1,4 @@
-// Package pgstore guarda las sesiones de auth en Postgres. Se buscan por el hash de su ID y los tokens van cifrados
-// (AES-256-GCM) con una clave del producto: quien lea la base no puede usar ni las sesiones ni los tokens.
+// Package pgstore guarda las sesiones en Postgres: por el hash de su ID y con los tokens cifrados (AES-256-GCM).
 package pgstore
 
 import (
@@ -17,7 +16,6 @@ import (
 	auth "github.com/AuthPointServices/auth-go"
 )
 
-// Schema crea las tablas; Migrate lo aplica, o el producto lo copia a sus migraciones.
 const Schema = `
 CREATE TABLE IF NOT EXISTS auth_sessions (
 	id_hash           bytea PRIMARY KEY,
@@ -41,7 +39,6 @@ CREATE TABLE IF NOT EXISTS auth_logins (
 CREATE INDEX IF NOT EXISTS auth_logins_expires ON auth_logins (expires_at);
 `
 
-// DB es lo que hace falta de un *pgxpool.Pool.
 type DB interface {
 	Exec(ctx context.Context, sql string, args ...any) (pgconn.CommandTag, error)
 	QueryRow(ctx context.Context, sql string, args ...any) pgx.Row
@@ -55,8 +52,7 @@ type Store struct {
 
 var _ auth.Store = (*Store)(nil)
 
-// New necesita una clave de 32 bytes, la misma en todas las instancias del producto. Cambiarla cierra todas las
-// sesiones (ya no se pueden descifrar).
+// key: 32 bytes, la misma en todas las instancias. Cambiarla cierra todas las sesiones.
 func New(db DB, key []byte) (*Store, error) {
 	if len(key) != 32 {
 		return nil, errors.New("pgstore: key must be 32 bytes")
@@ -77,7 +73,6 @@ func (s *Store) Migrate(ctx context.Context) error {
 	return err
 }
 
-// DeleteExpired borra lo vencido; conviene llamarlo de vez en cuando (una vez por hora sobra).
 func (s *Store) DeleteExpired(ctx context.Context) (int64, error) {
 	a, err := s.db.Exec(ctx, `DELETE FROM auth_sessions WHERE expires_at <= now()`)
 	if err != nil {
@@ -90,7 +85,7 @@ func (s *Store) DeleteExpired(ctx context.Context) (int64, error) {
 	return a.RowsAffected() + b.RowsAffected(), nil
 }
 
-// seal cifra v ligado a la fila (aad = su clave): un cifrado copiado a otra fila no se descifra.
+// El aad es la clave de la fila: un cifrado copiado a otra no se abre.
 func (s *Store) seal(v any, aad []byte) ([]byte, error) {
 	plain, err := json.Marshal(v)
 	if err != nil {
@@ -181,8 +176,6 @@ func (s *Store) Get(ctx context.Context, id string) (*auth.Session, error) {
 	return s.scan(s.db.QueryRow(ctx, `SELECT `+columns+` FROM auth_sessions WHERE id_hash = $1 AND expires_at > now()`, auth.HashID(id)), id)
 }
 
-// Update bloquea la fila (FOR UPDATE) mientras corre fn: los demás refrescos de la misma sesión esperan y luego ven
-// lo que guardó este.
 func (s *Store) Update(ctx context.Context, id string, fn func(*auth.Session) error) error {
 	tx, err := s.db.Begin(ctx)
 	if err != nil {
