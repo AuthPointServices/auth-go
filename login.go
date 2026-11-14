@@ -44,6 +44,7 @@ func (a *Auth) handleLogin(w http.ResponseWriter, r *http.Request) {
 	if v := q.Get("locale"); locale.MatchString(v) {
 		opts = append(opts, oauth2.SetAuthURLParam("ui_locales", v))
 	}
+	// #nosec G710 -- el destino es el endpoint de autorización del emisor configurado; lo del pedido va como parámetro.
 	http.Redirect(w, r, a.oauth.AuthCodeURL(state, opts...), http.StatusFound)
 }
 
@@ -59,15 +60,16 @@ func safeReturn(p string) string {
 	return p
 }
 
+// Secure va siempre que el producto es https; sólo en desarrollo (http://localhost) no se puede.
 func (a *Auth) newCookie(name, value string, ttl time.Duration) *http.Cookie {
-	return &http.Cookie{
+	return &http.Cookie{ // #nosec G124 -- Secure depende de BaseURL, ver arriba
 		Name: name, Value: value, Path: "/", MaxAge: int(ttl.Seconds()),
 		HttpOnly: true, Secure: a.secure, SameSite: http.SameSiteLaxMode,
 	}
 }
 
 func (a *Auth) clearCookie(w http.ResponseWriter, name string) {
-	http.SetCookie(w, &http.Cookie{Name: name, Value: "", Path: "/", MaxAge: -1, HttpOnly: true, Secure: a.secure, SameSite: http.SameSiteLaxMode})
+	http.SetCookie(w, &http.Cookie{Name: name, Value: "", Path: "/", MaxAge: -1, HttpOnly: true, Secure: a.secure, SameSite: http.SameSiteLaxMode}) // #nosec G124 -- como newCookie
 }
 
 // fail registra el error y responde sin dar detalles.
