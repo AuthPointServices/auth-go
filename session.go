@@ -23,11 +23,16 @@ func FromContext(ctx context.Context) (*Session, bool) {
 	return s, ok
 }
 
+// NewContext deja s en ctx como lo haría Require; sirve para probar los handlers del producto.
+func NewContext(ctx context.Context, s *Session) context.Context {
+	return context.WithValue(ctx, ctxKey{}, s)
+}
+
 // Load lee la sesión de la cookie, renueva su token si hace falta y la deja en el contexto. Sin sesión, sigue igual.
 func (a *Auth) Load(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if s := a.current(w, r); s != nil {
-			r = r.WithContext(context.WithValue(r.Context(), ctxKey{}, s))
+			r = r.WithContext(NewContext(r.Context(), s))
 		}
 		next.ServeHTTP(w, r)
 	})
@@ -44,7 +49,7 @@ func (a *Auth) Require(next http.Handler) http.Handler {
 			_, _ = w.Write([]byte(`{"error":"unauthenticated"}`))
 			return
 		}
-		next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), ctxKey{}, s)))
+		next.ServeHTTP(w, r.WithContext(NewContext(r.Context(), s)))
 	}))
 }
 
