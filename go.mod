@@ -5,6 +5,7 @@ go 1.26.0
 require (
 	github.com/lestrrat-go/httprc/v3 v3.0.6
 	github.com/lestrrat-go/jwx/v3 v3.4.0
+	golang.org/x/oauth2 v0.38.0
 )
 
 require (
