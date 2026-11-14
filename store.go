@@ -24,7 +24,6 @@ type Session struct {
 	RefreshToken string
 	AccessExpiry time.Time
 	CreatedAt    time.Time
-	LastSeen     time.Time
 	ExpiresAt    time.Time
 }
 
@@ -37,7 +36,8 @@ type Login struct {
 }
 
 // Store guarda sesiones e inicios de sesión. Update debe excluir a otros Update de la misma sesión mientras corre
-// fn: el refresh token sirve una sola vez y dos refrescos a la vez cerrarían la sesión.
+// fn (el refresh token sirve una sola vez y dos refrescos a la vez cerrarían la sesión) y darle a fn la sesión con
+// su ID.
 type Store interface {
 	SaveLogin(ctx context.Context, state string, l Login) error
 	// TakeLogin lo devuelve y lo borra: cada state sirve una vez.
@@ -122,6 +122,7 @@ func (m *MemoryStore) Update(_ context.Context, id string, fn func(*Session) err
 	if !ok || !m.now().Before(s.ExpiresAt) {
 		return ErrNotFound
 	}
+	s.ID = id
 	if err := fn(&s); err != nil {
 		return err
 	}

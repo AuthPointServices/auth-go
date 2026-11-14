@@ -19,7 +19,7 @@ func Run(t *testing.T, open func(t *testing.T) auth.Store) {
 		return &auth.Session{
 			ID: id, SID: sid, Identity: auth.Identity{Subject: sub, Email: sub + "@example.test", Name: "Ana Pérez"},
 			IDToken: "id-" + id, AccessToken: "at-" + id, RefreshToken: "rt-" + id, AccessExpiry: now.Add(5 * time.Minute),
-			CreatedAt: now, LastSeen: now, ExpiresAt: now.Add(time.Hour),
+			CreatedAt: now, ExpiresAt: now.Add(time.Hour),
 		}
 	}
 
@@ -78,7 +78,13 @@ func Run(t *testing.T, open func(t *testing.T) auth.Store) {
 	t.Run("update saves only on success", func(t *testing.T) {
 		s := open(t)
 		_ = s.Create(ctx, session("a", "s1", "u1"))
-		if err := s.Update(ctx, "a", func(x *auth.Session) error { x.AccessToken = "new"; return nil }); err != nil {
+		if err := s.Update(ctx, "a", func(x *auth.Session) error {
+			if x.ID != "a" {
+				t.Errorf("update sees id %q", x.ID)
+			}
+			x.AccessToken = "new"
+			return nil
+		}); err != nil {
 			t.Fatal(err)
 		}
 		boom := errors.New("boom")
