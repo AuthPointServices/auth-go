@@ -58,6 +58,12 @@ func cookie(res *http.Response, name string) *http.Cookie {
 // login hace el ida y vuelta completo y devuelve la cookie de sesión.
 func (x *app) login(t *testing.T, returnTo string) *http.Cookie {
 	t.Helper()
+	return x.loginWith(t, returnTo, "", returnTo)
+}
+
+// loginWith vuelve del emisor con `extra` en la query y espera acabar en `want`.
+func (x *app) loginWith(t *testing.T, returnTo, extra, want string) *http.Cookie {
+	t.Helper()
 	res := x.do(httptest.NewRequest(http.MethodGet, "/auth/login?return_to="+url.QueryEscape(returnTo), nil))
 	if res.StatusCode != http.StatusFound {
 		t.Fatalf("login: %d", res.StatusCode)
@@ -82,10 +88,10 @@ func (x *app) login(t *testing.T, returnTo string) *http.Cookie {
 				"nonce": nonce, "sid": "s1", "email": "ana@example.test", "email_verified": true}),
 		}
 	})
-	req := httptest.NewRequest(http.MethodGet, "/auth/callback?code=c1&state="+state, nil)
+	req := httptest.NewRequest(http.MethodGet, "/auth/callback?code=c1&state="+state+extra, nil)
 	req.AddCookie(cookie(res, "login"))
 	back := x.do(req)
-	if back.StatusCode != http.StatusSeeOther || back.Header.Get("Location") != returnTo {
+	if back.StatusCode != http.StatusSeeOther || back.Header.Get("Location") != want {
 		t.Fatalf("callback: %d → %s", back.StatusCode, back.Header.Get("Location"))
 	}
 	c := cookie(back, "session")
@@ -128,6 +134,12 @@ func TestLoginFlow(t *testing.T) {
 	if got := body(x.get("/auth/session", nil)); !strings.Contains(got, `"authenticated":false`) {
 		t.Fatalf("anonymous session = %s", got)
 	}
+}
+
+func TestActionStatusReachesTheApp(t *testing.T) {
+	x := newApp(t)
+	x.loginWith(t, "/security", "&kc_action_status=success", "/security?action_status=success")
+	x.loginWith(t, "/security", "&kc_action_status=whatever", "/security")
 }
 
 func TestCallbackRejects(t *testing.T) {

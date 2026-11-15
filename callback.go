@@ -60,8 +60,15 @@ func (a *Auth) handleCallback(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	http.SetCookie(w, a.newCookie(a.cookie, s.ID, a.cfg.MaxAge))
-	http.Redirect(w, r, l.ReturnTo, http.StatusSeeOther)
+	to := l.ReturnTo
+	// Tras una acción de la cuenta, Keycloak dice cómo acabó; la app lo confirma.
+	if st := q.Get("kc_action_status"); actionStatus[st] {
+		to = withParam(to, "action_status", st)
+	}
+	http.Redirect(w, r, to, http.StatusSeeOther)
 }
+
+var actionStatus = map[string]bool{"success": true, "cancelled": true, "error": true}
 
 func withParam(path, k, v string) string {
 	u, err := url.Parse(path)
