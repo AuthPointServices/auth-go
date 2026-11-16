@@ -31,6 +31,8 @@ type Login struct {
 	Nonce     string
 	ReturnTo  string
 	ExpiresAt time.Time
+	// Retry marca el inicio que abre la vuelta de uno que este navegador ya no esperaba (ver stale).
+	Retry bool `json:",omitempty"`
 }
 
 // Update debe excluir a otros Update de la misma sesión mientras corre fn, y darle la sesión con su ID.

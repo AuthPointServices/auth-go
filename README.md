@@ -31,7 +31,7 @@ renovado si hacía falta.
 | Ruta | Para qué |
 |---|---|
 | `GET /auth/login?return_to=/ruta` | Manda a entrar. `prompt=create` abre el registro; `action=UPDATE_PASSWORD` y similares lanzan una acción de la cuenta |
-| `GET /auth/callback` | La vuelta del emisor; abre la sesión y vuelve a `return_to`, con `auth_error=…` si el emisor no terminó, o `action_status=success\|cancelled\|error` tras una acción |
+| `GET /auth/callback` | La vuelta del emisor; abre la sesión y vuelve a `return_to`, con `auth_error=…` si el emisor no terminó, o `action_status=success\|cancelled\|error` tras una acción. Si la vuelta es de un inicio que este navegador ya no espera (la página de acceso siguió abierta en otra pestaña o más de 10 min), no canjea su código: empieza un inicio nuevo una vez, que con la sesión del emisor vuelve sin pedir nada |
 | `GET /auth/session` | `{"authenticated": true, "user": {...}}` para el frontend; nunca da tokens |
 | `POST /auth/logout` | Cierra aquí y en el emisor (formulario, no `fetch`: el navegador sigue la redirección) |
 | `POST /auth/backchannel-logout` | El emisor avisa que una sesión se cerró en otro lado |

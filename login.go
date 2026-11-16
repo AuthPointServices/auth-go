@@ -22,7 +22,7 @@ var (
 func (a *Auth) handleLogin(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
 	state := newID()
-	l := Login{Verifier: oauth2.GenerateVerifier(), Nonce: newID(), ReturnTo: safeReturn(q.Get("return_to")), ExpiresAt: a.now().Add(loginTTL)}
+	l := Login{Verifier: oauth2.GenerateVerifier(), Nonce: newID(), ReturnTo: safeReturn(q.Get("return_to")), ExpiresAt: a.now().Add(loginTTL), Retry: q.Get("retry") == "1"}
 	if err := a.cfg.Store.SaveLogin(r.Context(), state, l); err != nil {
 		a.fail(w, r, "save login", err)
 		return

@@ -148,14 +148,29 @@ func TestCallbackRejects(t *testing.T) {
 	state, _ := url.Parse(res.Header.Get("Location"))
 	login := cookie(res, "login")
 
-	// Otro state, o sin la cookie de este navegador.
+	// Una vuelta que este navegador ya no espera (otra pestaña, o la cookie caducó): su código no se canjea, y un
+	// inicio nuevo vuelve a donde iba aquel, o a la portada si ya no se sabe.
+	x.f.onToken(func(map[string]string) (int, any) {
+		t.Error("a stale callback must not exchange its code")
+		return http.StatusBadRequest, nil
+	})
 	req := httptest.NewRequest(http.MethodGet, "/auth/callback?code=c1&state=other", nil)
 	req.AddCookie(login)
-	if res := x.do(req); res.StatusCode != http.StatusBadRequest {
-		t.Fatalf("other state: %d", res.StatusCode)
+	if res := x.do(req); res.StatusCode != http.StatusSeeOther || res.Header.Get("Location") != "/auth/login?retry=1&return_to=%2F" {
+		t.Fatalf("other state: %d → %s", res.StatusCode, res.Header.Get("Location"))
 	}
-	if res := x.do(httptest.NewRequest(http.MethodGet, "/auth/callback?code=c1&state="+state.Query().Get("state"), nil)); res.StatusCode != http.StatusBadRequest {
-		t.Fatalf("no cookie: %d", res.StatusCode)
+	if res := x.do(httptest.NewRequest(http.MethodGet, "/auth/callback?code=c1&state="+state.Query().Get("state"), nil)); res.Header.Get("Location") != "/auth/login?retry=1&return_to=%2Ffiles" {
+		t.Fatalf("no cookie → %s", res.Header.Get("Location"))
+	}
+
+	// El reintento sólo va una vez: si su vuelta tampoco cuadra (sin cookies), se dice. Sin código tampoco se reintenta.
+	res = x.do(httptest.NewRequest(http.MethodGet, "/auth/login?retry=1&return_to=/files", nil))
+	retry, _ := url.Parse(res.Header.Get("Location"))
+	if res := x.do(httptest.NewRequest(http.MethodGet, "/auth/callback?code=c1&state="+retry.Query().Get("state"), nil)); res.StatusCode != http.StatusBadRequest {
+		t.Fatalf("retry without cookie: %d", res.StatusCode)
+	}
+	if res := x.do(httptest.NewRequest(http.MethodGet, "/auth/callback?error=access_denied&state=other", nil)); res.StatusCode != http.StatusBadRequest {
+		t.Fatalf("error without cookie: %d", res.StatusCode)
 	}
 
 	// La persona canceló en el emisor: vuelve a donde estaba con el motivo.
