@@ -163,14 +163,15 @@ func TestCallbackRejects(t *testing.T) {
 		t.Fatalf("no cookie → %s", res.Header.Get("Location"))
 	}
 
-	// El reintento sólo va una vez: si su vuelta tampoco cuadra (sin cookies), se dice. Sin código tampoco se reintenta.
+	// El reintento sólo va una vez: si su vuelta tampoco cuadra (sin cookies), el producto lo cuenta y ofrece empezar
+	// de nuevo. Sin código tampoco se reintenta.
 	res = x.do(httptest.NewRequest(http.MethodGet, "/auth/login?retry=1&return_to=/files", nil))
 	retry, _ := url.Parse(res.Header.Get("Location"))
-	if res := x.do(httptest.NewRequest(http.MethodGet, "/auth/callback?code=c1&state="+retry.Query().Get("state"), nil)); res.StatusCode != http.StatusBadRequest {
-		t.Fatalf("retry without cookie: %d", res.StatusCode)
+	if res := x.do(httptest.NewRequest(http.MethodGet, "/auth/callback?code=c1&state="+retry.Query().Get("state"), nil)); res.StatusCode != http.StatusSeeOther || res.Header.Get("Location") != "/files?auth_error=interrupted" {
+		t.Fatalf("retry without cookie: %d → %s", res.StatusCode, res.Header.Get("Location"))
 	}
-	if res := x.do(httptest.NewRequest(http.MethodGet, "/auth/callback?error=access_denied&state=other", nil)); res.StatusCode != http.StatusBadRequest {
-		t.Fatalf("error without cookie: %d", res.StatusCode)
+	if res := x.do(httptest.NewRequest(http.MethodGet, "/auth/callback?error=access_denied&state=other", nil)); res.StatusCode != http.StatusSeeOther || res.Header.Get("Location") != "/?auth_error=interrupted" {
+		t.Fatalf("error without cookie: %d → %s", res.StatusCode, res.Header.Get("Location"))
 	}
 
 	// La persona canceló en el emisor: vuelve a donde estaba con el motivo.
@@ -180,6 +181,18 @@ func TestCallbackRejects(t *testing.T) {
 	req.AddCookie(cookie(res, "login"))
 	if res := x.do(req); res.Header.Get("Location") != "/files?auth_error=access_denied" {
 		t.Fatalf("cancel → %s", res.Header.Get("Location"))
+	}
+
+	// Un fallo del servidor (no se pudo canjear el código) lo cuenta el producto, no una página pelada.
+	res = x.do(httptest.NewRequest(http.MethodGet, "/auth/login?return_to=/files", nil))
+	to, _ = url.Parse(res.Header.Get("Location"))
+	x.f.onToken(func(map[string]string) (int, any) {
+		return http.StatusBadRequest, map[string]string{"error": "invalid_grant"}
+	})
+	req = httptest.NewRequest(http.MethodGet, "/auth/callback?code=c1&state="+to.Query().Get("state"), nil)
+	req.AddCookie(cookie(res, "login"))
+	if res := x.do(req); res.StatusCode != http.StatusSeeOther || res.Header.Get("Location") != "/?auth_error=failed" {
+		t.Fatalf("exchange failure: %d → %s", res.StatusCode, res.Header.Get("Location"))
 	}
 }
 

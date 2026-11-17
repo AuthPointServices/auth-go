@@ -76,7 +76,13 @@ func (a *Auth) stale(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
 	l, err := a.cfg.Store.TakeLogin(r.Context(), q.Get("state"))
 	if q.Get("code") == "" || l.Retry {
-		http.Error(w, "El inicio de sesión no es válido o caducó. Vuelve a intentarlo.", http.StatusBadRequest)
+		// Ni hay código que canjear ni el reintento cuadró (otra pestaña, cookies bloqueadas o pasó loginTTL): lo
+		// cuenta el producto, con su marca y una salida, en vez de una página pelada del servidor.
+		to := l.ReturnTo
+		if err != nil || to == "" {
+			to = "/"
+		}
+		http.Redirect(w, r, withParam(to, "auth_error", "interrupted"), http.StatusSeeOther)
 		return
 	}
 	to := "/"

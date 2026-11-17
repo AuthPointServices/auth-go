@@ -71,5 +71,6 @@ func (a *Auth) clearCookie(w http.ResponseWriter, name string) {
 
 func (a *Auth) fail(w http.ResponseWriter, r *http.Request, what string, err error) {
 	a.log.ErrorContext(r.Context(), "auth: "+what, "err", err)
-	http.Error(w, "No se pudo iniciar sesión. Vuelve a intentarlo.", http.StatusInternalServerError)
+	// El producto lo cuenta con su marca; el fallo queda en el registro.
+	http.Redirect(w, r, "/?auth_error=failed", http.StatusSeeOther)
 }
