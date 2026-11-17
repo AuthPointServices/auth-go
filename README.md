@@ -13,7 +13,7 @@ store, _ := pgstore.New(db, sessionKey) // 32 bytes, la misma en todas las insta
 _ = store.Migrate(ctx)                  // o copiar pgstore.Schema a las migraciones del producto
 
 a, err := auth.New(ctx, auth.Config{
-	Issuer:       "https://auth.fretchcop.space/realms/fretchcop",
+	Issuer:       "https://auth.fretchcop.space/realms/seedle",
 	ClientID:     "orange",
 	ClientSecret: os.Getenv("AUTH_CLIENT_SECRET"),
 	BaseURL:      "https://orange.com", // o https://orange.fretchcop.space
