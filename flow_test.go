@@ -142,6 +142,20 @@ func TestActionStatusReachesTheApp(t *testing.T) {
 	x.loginWith(t, "/security", "&kc_action_status=whatever", "/security")
 }
 
+func TestActionReachesTheIssuer(t *testing.T) {
+	x := newApp(t)
+	for action, want := range map[string]string{
+		"CONFIGURE_TOTP": "CONFIGURE_TOTP", "idp_link:google": "idp_link:google", "idp_link:my.idp-2": "idp_link:my.idp-2",
+		"idp_link:": "", "a b": "", "idp_link:x/../y": "", "x:y:z": "",
+	} {
+		res := x.do(httptest.NewRequest(http.MethodGet, "/auth/login?action="+url.QueryEscape(action), nil))
+		to, _ := url.Parse(res.Header.Get("Location"))
+		if got := to.Query().Get("kc_action"); got != want {
+			t.Errorf("action %q → kc_action %q, want %q", action, got, want)
+		}
+	}
+}
+
 func TestCallbackRejects(t *testing.T) {
 	x := newApp(t)
 	res := x.do(httptest.NewRequest(http.MethodGet, "/auth/login?return_to=/files", nil))

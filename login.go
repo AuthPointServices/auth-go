@@ -14,8 +14,9 @@ const loginTTL = 10 * time.Minute
 
 var (
 	prompts = map[string]bool{"login": true, "create": true}
-	action  = regexp.MustCompile(`^[A-Za-z_-]{1,64}$`)
-	locale  = regexp.MustCompile(`^[a-z]{2}(-[A-Z]{2})?$`)
+	// Con su parámetro, si lo lleva: «idp_link:google».
+	action = regexp.MustCompile(`^[A-Za-z_-]{1,64}(:[A-Za-z0-9._-]{1,64})?$`)
+	locale = regexp.MustCompile(`^[a-z]{2}(-[A-Z]{2})?$`)
 )
 
 // El state va también en una cookie: la vuelta sólo vale en este navegador.
